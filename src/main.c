@@ -6,7 +6,7 @@
 /*   By: ecamara <ecamara@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/06/23 16:40:10 by eperaita          #+#    #+#             */
-/*   Updated: 2022/12/05 16:29:52 by ecamara          ###   ########.fr       */
+/*   Updated: 2022/12/06 13:26:02 by ecamara          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -56,6 +56,49 @@ void	render(t_data *data)
 	destroyTree(data->tree);
 }
 
+void	*clearMultiScreen(void *temp)
+{
+	int	i;
+	int	j;
+	int	temp_id;
+
+	temp_id = g_ids;
+	g_ids++;
+	t_data *data = temp;
+	j = temp_id;
+	while(j < HEIGH)
+	{
+		i = 0;
+		while (i < WIDTH)
+		{
+			data->bakery.frames->add[j * WIDTH + i] = 0;
+			i++;
+		}
+		j += THREADS;
+	}
+	return (NULL);
+}
+
+void clearMulti(t_data *data)
+{
+	int	i;
+
+	i = 0;
+	g_ids = 0;
+	cubism(data);
+	while (i < THREADS)
+	{
+		if (pthread_create(&data->mutex[i], NULL, &gravity,
+				data) != 0)
+			return ;
+		i++;
+	}
+	i = -1;
+	while (++i < THREADS)
+		pthread_join(data->mutex[i], NULL);
+	g_ids = 0;
+}
+
 int	showframes(t_data *data)
 {
 	if (BAKED)
@@ -87,6 +130,7 @@ int	showframes(t_data *data)
 	{
 		render(data);
 		mlx_put_image_to_window(data->mlx.mlx, data->mlx.win, data->bakery.frames->img, 0,0);
+		//clearMulti(data);
 	}
 	return (0);
 }
@@ -206,16 +250,19 @@ void	calculateForce(t_data *data, t_particule particule, t_node *node, double di
 {
 	t_uv u;
 
-	u = uv_res(node->center, particule.pos);
-	u = uv_mul(uv_normalized(u), node->mass / dis);
-	data->particules.array[particule.id].u = uv_sum(data->particules.array[particule.id].u, u);
+	if (dis > 20)
+	{
+		u = uv_res(node->center, particule.pos);
+		u = uv_mul(uv_normalized(u), node->mass / dis);
+		data->particules.array[particule.id].u = uv_sum(data->particules.array[particule.id].u, u);
+	}
 }
 
 void	calculateForce2(t_particule *particule1, double dis, t_uv vec)
 {
 	t_uv u;
 
-	if (dis > 10)
+	if (dis > 20)
 	{
 		u = vec;
 		u = uv_mul(uv_normalized(u), 1 / dis);
@@ -273,6 +320,29 @@ int	intclamp(int min, int max, int value)
 	return value;
 }
 
+void	wormholeForce(t_data *data, t_particule *particule)
+{
+	//t_uv u;
+	t_uv vec;
+	double	len;
+
+	vec = uv_res(data->wormhole.pos1, particule->pos);
+	len =  uv_len(vec);
+	if (len > 0.5)
+		particule->u = uv_sum(uv_mul(uv_normalized(vec), data->wormhole.force / len), particule->u);
+	vec = uv_res(data->wormhole.pos2, particule->pos);
+	len =  uv_len(vec);
+	if (len > 0.5)
+		particule->u = uv_res(particule->u, uv_mul(uv_normalized(vec), data->wormhole.force / uv_len(vec)));
+}
+
+int	insideCirc(t_uv pos, t_uv center, double radious)
+{
+	if (uv_len(uv_res(pos, center)) <= radious)
+		return (1);
+	return (0);
+}
+
 void	*gravity(void *temp)
 {
 	int	j;
@@ -285,21 +355,36 @@ void	*gravity(void *temp)
 	j = temp_id;
 	while (j < data->particules.max)
 	{
-		{
-			searchTree(data, &data->particules.array[j], data->tree);
-		}
+		searchTree(data, &data->particules.array[j], data->tree);
+		wormholeForce(data, &data->particules.array[j]);
 		j += THREADS;
 	}
+	//j = temp_id;
+	/*while(j < data->particules.max)
+	{
+		data->bakery.frames->add[intclamp(0, WIDTH * HEIGH - 1,(int)data->particules.array[j].pos.y * WIDTH + (int)data->particules.array[j].pos.x)] = 0;
+		j += THREADS;
+	}
+	usleep(100);*/
 	j = temp_id;
 	while (j < data->particules.max)
 	{
 		data->bakery.frames->add[intclamp(0, WIDTH * HEIGH - 1,(int)data->particules.array[j].pos.y * WIDTH + (int)data->particules.array[j].pos.x)] = 0;
 		hold = uv_sum(data->particules.array[j].pos, data->particules.array[j].u);
 		if (!insideRect(hold, uv(WIDTH, 0), uv(0, HEIGH)))
-			data->particules.array[j].pos = uv(WIDTH / 2 - clamp(0, WIDTH, hold.x) + WIDTH / 2, HEIGH / 2 - clamp(0, HEIGH, hold.y) + WIDTH / 2);
+		{
+			/*data->particules.array[j].u = uv_mul(data->particules.array[j].u, -1);*/data->particules.array[j].pos = uv(clamp(5, WIDTH - 5, (WIDTH / 2 - hold.x) + WIDTH / 2), clamp(5, HEIGH - 5, (HEIGH / 2 - hold.y) + HEIGH / 2));
+			data->particules.array[j].u = uv_div(data->particules.array[j].u, 2);
+		}
+		else if (WORMHOLE && insideCirc(hold, data->wormhole.pos1, data->wormhole.radious))
+		{
+			data->particules.array[j].pos = hold;
+			data->particules.array[j].pos.x += WIDTH / 2;
+			data->particules.array[j].u = uv_div(uv_mul(data->particules.array[j].u, -1), 2);
+		}
 		else
 			data->particules.array[j].pos = hold;
-		data->bakery.frames->add[intclamp(0, WIDTH * HEIGH - 1, (int)data->particules.array[j].pos.y * WIDTH + (int)data->particules.array[j].pos.x)] = 16777215;
+		data->bakery.frames->add[intclamp(0, WIDTH * HEIGH - 1, (int)data->particules.array[j].pos.y * WIDTH + (int)data->particules.array[j].pos.x)] += 16777215 / 10000 * (int)uv_len(data->particules.array[j].u); // /1000
 		j += THREADS;
 	}
 	return (NULL);
@@ -404,6 +489,14 @@ void	backeryStart(t_data *data)
 	}
 }
 
+void	set_wormhole(t_data *data)
+{
+	data->wormhole.pos1 = uv(WIDTH / 4, HEIGH / 2);
+	data->wormhole.pos2 = uv(WIDTH / 4 * 3, HEIGH / 2);
+	data->wormhole.force = 100;
+	data->wormhole.radious = 100;
+}
+
 int	main(int argc, char *argv[])
 {
 	t_data	data;
@@ -415,6 +508,8 @@ int	main(int argc, char *argv[])
 	set_map(&data);
 	setParticules(&data, argv[1]);
 	backeryStart(&data);
+	if (WORMHOLE)
+		set_wormhole(&data);
 	gettimeofday(&data.now, NULL);
 	data.time = 1;
 	(void)argv;

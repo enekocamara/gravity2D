@@ -6,17 +6,17 @@
 /*   By: ecamara <ecamara@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/06/16 15:36:04 by ecamara           #+#    #+#             */
-/*   Updated: 2022/12/05 15:25:40 by ecamara          ###   ########.fr       */
+/*   Updated: 2022/12/06 13:10:15 by ecamara          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef MINIRT_H
 # define MINIRT_H
 
-# define HEIGH 1000
-# define WIDTH 1000
+# define HEIGH 1300 * 1
+# define WIDTH 2500 * 1
 # define RES 10
-# define THREADS 2
+# define THREADS 12
 # define TIME 1
 
 # define KNRM  "\x1B[0m"
@@ -32,9 +32,10 @@
 # define SKBH	4096
 # define SKBD	1365
 # define SKBD2	682
-#define MINDIS	1414 * 10
+#define MINDIS	sqrt(HEIGH * HEIGH + WIDTH * WIDTH) * 6
 #define FRAMES 50
 #define BAKED 0
+#define WORMHOLE 1
 
 # include <stdint.h>
 # include <pthread.h>
@@ -151,6 +152,14 @@ typedef struct s_particule
 	struct s_node	*node;
 }t_particule;
 
+typedef struct s_wormhole
+{
+	t_uv pos1;
+	t_uv pos2;
+	int	force;
+	double radious;
+}t_wormhole;
+
 typedef struct s_node
 {
 	int		mass;
@@ -186,6 +195,7 @@ typedef struct s_data
 	t_objects	particules;
 	pthread_t	*mutex;
 	t_bakery	bakery;
+	t_wormhole	wormhole;
 	struct timeval	now;
 	struct timeval	later;
 	int				time;

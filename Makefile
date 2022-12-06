@@ -6,7 +6,7 @@
 #    By: ecamara <ecamara@student.42.fr>            +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2022/05/04 13:37:33 by ecamara           #+#    #+#              #
-#    Updated: 2022/12/05 14:41:48 by ecamara          ###   ########.fr        #
+#    Updated: 2022/12/06 11:22:27 by ecamara          ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -28,7 +28,7 @@ INCLUDES = minirt.h
 
 SRCO = $(SRC:.c=.o)
 
-FLG = -Wall -Werror -Wextra #-g3 -fsanitize=address
+FLG = -Wall -Werror -Wextra -O2 #-g3 -fsanitize=address
 CC = gcc
 
 LIB = libft/libft.a
